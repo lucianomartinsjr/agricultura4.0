@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agricultura 4.0 - Análise de Culturas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2E7D32;
+            --secondary-color: #81C784;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            background-color: white;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-control {
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid #ced4da;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 0.2rem rgba(129, 199, 132, 0.25);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: #1B5E20;
+            transform: translateY(-2px);
+        }
+
+        .resultado {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 12px;
+            background-color: #F1F8E9;
+            border: 1px solid var(--secondary-color);
+        }
+
+        .input-group-text {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        #loading {
+            display: none;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            background-color: #E3F2FD;
+            border: none;
+        }
+
+        #resultado {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 12px;
+            background-color: #F1F8E9;
+            border: 1px solid var(--secondary-color);
+        }
+
+        /* Novo estilo para o loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 1rem;
+        }
+
+        .loading-steps {
+            margin-top: 1rem;
+            text-align: left;
+        }
+
+        .loading-step {
+            margin: 0.5rem 0;
+            opacity: 0.5;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-step.active {
+            opacity: 1;
+            color: var(--primary-color);
+        }
+
+        /* Animação de pulso para o botão durante o processamento */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .btn-processing {
+            animation: pulse 2s infinite;
+        }
+
+        .modal-content {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 15px 15px 0 0;
+        }
+
+        .modal-footer {
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .resultado-detalhes pre {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>
+                <i class="fas fa-leaf me-2"></i>
+                Agricultura 4.0 - Análise de Culturas
+            </h1>
+            
+            <div id="locationStatus" class="alert alert-info mb-3 d-flex justify-content-between align-items-center" style="display: none;">
+                <div>
+                    <i class="fas fa-location-dot me-2"></i>
+                    <span id="locationMessage">Localização não detectada</span>
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnLocation">
+                    <i class="fas fa-location-crosshairs me-2"></i>Usar minha localização
+                </button>
+            </div>
+            
+            <form id="agriculturaForm">
+                <div class="row">
+                    <!-- Informações Básicas -->
+                    <div class="col-md-6 mb-4">
+                        <h4 class="mb-3"><i class="fas fa-info-circle me-2"></i>Informações Básicas</h4>
+                        <div class="mb-3">
+                            <label for="tipo_cultura" class="form-label">
+                                <i class="fas fa-seedling me-2"></i>Tipo de Cultura
+                            </label>
+                            <input type="text" class="form-control" id="tipo_cultura" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="estagio_cultura" class="form-label">
+                                <i class="fas fa-leaf me-2"></i>Estágio da Cultura
+                            </label>
+                            <select class="form-control" id="estagio_cultura" required>
+                                <option value="">Selecione o estágio</option>
+                                <option value="germinacao">Germinação</option>
+                                <option value="crescimento">Crescimento Vegetativo</option>
+                                <option value="floracao">Floração</option>
+                                <option value="frutificacao">Frutificação</option>
+                                <option value="colheita">Ponto de Colheita</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Dados Ambientais -->
+                    <div class="col-md-6 mb-4">
+                        <h4 class="mb-3"><i class="fas fa-cloud-sun me-2"></i>Dados Ambientais</h4>
+                        <div class="mb-3">
+                            <label for="temperatura" class="form-label">
+                                <i class="fas fa-temperature-high me-2"></i>Temperatura
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="temperatura" required>
+                                <span class="input-group-text">°C</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="umidade_solo" class="form-label">
+                                <i class="fas fa-tint me-2"></i>Umidade do Solo
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="umidade_solo" required>
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="umidade_ar" class="form-label">
+                                <i class="fas fa-wind me-2"></i>Umidade do Ar
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="umidade_ar" required>
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Histórico de Tratamentos -->
+                    <div class="col-12 mb-4">
+                        <h4 class="mb-3"><i class="fas fa-history me-2"></i>Histórico de Tratamentos</h4>
+                        <div class="mb-3">
+                            <label for="ultimos_tratamentos" class="form-label">
+                                <i class="fas fa-spray-can me-2"></i>Últimos Tratamentos Aplicados
+                            </label>
+                            <textarea class="form-control" id="ultimos_tratamentos" rows="3" 
+                                placeholder="Descreva os tratamentos realizados nos últimos 30 dias"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Sintomas e Observações -->
+                    <div class="col-12 mb-4">
+                        <h4 class="mb-3"><i class="fas fa-notes-medical me-2"></i>Sintomas e Observações</h4>
+                        <div class="mb-3">
+                            <label for="sintomas" class="form-label">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Sintomas Observados
+                            </label>
+                            <textarea class="form-control" id="sintomas" rows="3" 
+                                placeholder="Descreva quaisquer sintomas ou anomalias observadas"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-search me-2"></i>Analisar
+                    </button>
+                </div>
+            </form>
+            
+            <div class="loading-overlay" id="loading">
+                <div class="loading-content">
+                    <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <h4 class="text-primary mb-3">Analisando sua cultura</h4>
+                    <div class="loading-steps">
+                        <div class="loading-step" data-step="1">
+                            <i class="fas fa-search me-2"></i>Buscando informações da cultura...
+                        </div>
+                        <div class="loading-step" data-step="2">
+                            <i class="fas fa-microscope me-2"></i>Analisando condições ambientais...
+                        </div>
+                        <div class="loading-step" data-step="3">
+                            <i class="fas fa-flask me-2"></i>Processando diagnóstico...
+                        </div>
+                        <div class="loading-step" data-step="4">
+                            <i class="fas fa-clipboard-check me-2"></i>Gerando recomendações...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adicione este modal antes do fechamento do div.container -->
+    <div class="modal fade" id="resultadoModal" tabindex="-1" aria-labelledby="resultadoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title" id="resultadoModalLabel">
+                        <i class="fas fa-chart-bar text-success me-2"></i>
+                        Resultado da Análise
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="resultado-content">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="alert alert-success mb-4">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Análise concluída com sucesso!
+                                </div>
+                                <div class="resultado-detalhes">
+                                    <pre id="resultadoTexto" class="p-3 bg-light rounded"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Fechar
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btnDownloadPDF">
+                        <i class="fas fa-download me-2"></i>Baixar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        let userLatitude = null;
+        let userLongitude = null;
+
+        // Função para obter localização
+        function getUserLocation() {
+            const locationStatus = document.getElementById('locationStatus');
+            const locationMessage = document.getElementById('locationMessage');
+            
+            locationStatus.style.display = 'flex';
+            locationMessage.textContent = 'Obtendo sua localização...';
+            
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        userLatitude = position.coords.latitude;
+                        userLongitude = position.coords.longitude;
+                        locationMessage.textContent = `Localização obtida: ${userLatitude.toFixed(4)}, ${userLongitude.toFixed(4)}`;
+                        console.log("Localização obtida:", userLatitude, userLongitude);
+                    },
+                    function(error) {
+                        console.error("Erro ao obter localização:", error);
+                        locationMessage.textContent = 'Erro ao obter localização. Tente novamente.';
+                    }
+                );
+            } else {
+                locationMessage.textContent = 'Seu navegador não suporta geolocalização.';
+            }
+        }
+
+        // Adicionar evento de clique ao botão de localização
+        document.getElementById('btnLocation').addEventListener('click', getUserLocation);
+
+        // Mostrar o status inicial
+        document.getElementById('locationStatus').style.display = 'flex';
+
+        // Adicione esta função antes do event listener do formulário
+        function updateLoadingStep(step) {
+            document.querySelectorAll('.loading-step').forEach(el => {
+                el.classList.remove('active');
+                if (parseInt(el.dataset.step) <= step) {
+                    el.classList.add('active');
+                }
+            });
+        }
+
+        document.getElementById('agriculturaForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const loading = document.getElementById('loading');
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            const resultadoTexto = document.getElementById('resultadoTexto');
+            const resultadoModal = new bootstrap.Modal(document.getElementById('resultadoModal'));
+            
+            loading.style.display = 'flex';
+            submitButton.classList.add('btn-processing');
+            let currentStep = 1;
+            
+
+            const stepDurations = [20000, 20000, 20000, 250000]; // 20s, 20s, 20s, 25s para cada etapa
+            let totalTime = 0;
+            
+            updateLoadingStep(currentStep);
+            
+            const progressInterval = setInterval(() => {
+                if (currentStep < 4) {
+                    totalTime += stepDurations[currentStep - 1];
+                    currentStep++;
+                    updateLoadingStep(currentStep);
+                }
+            }, stepDurations[0]);
+
+            const dados = {
+                tipo_cultura: document.getElementById('tipo_cultura').value,
+                estagio_cultura: document.getElementById('estagio_cultura').value,
+                latitude: userLatitude,
+                longitude: userLongitude,
+                temperatura: document.getElementById('temperatura').value,
+                umidade_solo: document.getElementById('umidade_solo').value,
+                umidade_ar: document.getElementById('umidade_ar').value,
+                ultimos_tratamentos: document.getElementById('ultimos_tratamentos').value,
+                sintomas: document.getElementById('sintomas').value
+            };
+            
+            try {
+                // Garantir um tempo mínimo total de processamento
+                const minProcessingTime = 23000; // 23 segundos no total
+                const startTime = Date.now();
+                
+                const response = await fetch('/processar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(dados)
+                });
+                
+                const data = await response.json();
+                
+                // Calcular tempo restante para atingir o tempo mínimo
+                const elapsedTime = Date.now() - startTime;
+                if (elapsedTime < minProcessingTime) {
+                    await new Promise(resolve => setTimeout(resolve, minProcessingTime - elapsedTime));
+                }
+                
+                if (data.success) {
+                    resultadoTexto.textContent = data.resultado;
+                    resultadoModal.show();
+                } else {
+                    alert('Erro ao processar: ' + data.error);
+                }
+            } catch (error) {
+                alert('Erro ao comunicar com o servidor: ' + error);
+            } finally {
+                clearInterval(progressInterval);
+                loading.style.display = 'none';
+                submitButton.classList.remove('btn-processing');
+            }
+        });
+
+        // Adicione o evento para o botão de download (implementação básica)
+        document.getElementById('btnDownloadPDF').addEventListener('click', () => {
+            // Implemente aqui a lógica para download do PDF
+            alert('Funcionalidade de download em desenvolvimento');
+        });
+    </script>
+</body>
+</html>
