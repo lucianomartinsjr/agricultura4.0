@@ -6,6 +6,7 @@
     <title>Agricultura 4.0 - Análise de Culturas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         :root {
             --primary-color: #2E7D32;
@@ -143,7 +144,6 @@
             color: var(--primary-color);
         }
 
-        /* Animação de pulso para o botão durante o processamento */
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -170,11 +170,37 @@
         }
 
         .resultado-detalhes pre {
-            background-color: #f8f9fa;
-            border-radius: 8px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            padding: 25px;
+            background-color: #ffffff;
             border: 1px solid #e9ecef;
-            max-height: 400px;
+            border-radius: 12px;
+            max-height: 70vh;
             overflow-y: auto;
+            color: #2c3e50;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+        }
+
+        .resultado-detalhes pre::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .resultado-detalhes pre::-webkit-scrollbar-track {
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .resultado-detalhes pre::-webkit-scrollbar-thumb {
+            background: #c1c9d2;
+            border-radius: 5px;
+        }
+
+        .resultado-detalhes pre::-webkit-scrollbar-thumb:hover {
+            background: #a5adb6;
         }
     </style>
 </head>
@@ -198,7 +224,7 @@
             
             <form id="agriculturaForm">
                 <div class="row">
-                    <!-- Informações Básicas -->
+
                     <div class="col-md-6 mb-4">
                         <h4 class="mb-3"><i class="fas fa-info-circle me-2"></i>Informações Básicas</h4>
                         <div class="mb-3">
@@ -206,6 +232,19 @@
                                 <i class="fas fa-seedling me-2"></i>Tipo de Cultura
                             </label>
                             <input type="text" class="form-control" id="tipo_cultura" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regiao" class="form-label">
+                                <i class="fas fa-map-marker-alt me-2"></i>Região
+                            </label>
+                            <select class="form-control" id="regiao" required>
+                                <option value="">Selecione a região</option>
+                                <option value="norte">Norte</option>
+                                <option value="nordeste">Nordeste</option>
+                                <option value="centro-oeste">Centro-Oeste</option>
+                                <option value="sudeste">Sudeste</option>
+                                <option value="sul">Sul</option>
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label for="estagio_cultura" class="form-label">
@@ -311,7 +350,6 @@
         </div>
     </div>
 
-    <!-- Adicione este modal antes do fechamento do div.container -->
     <div class="modal fade" id="resultadoModal" tabindex="-1" aria-labelledby="resultadoModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
@@ -355,7 +393,6 @@
         let userLatitude = null;
         let userLongitude = null;
 
-        // Função para obter localização
         function getUserLocation() {
             const locationStatus = document.getElementById('locationStatus');
             const locationMessage = document.getElementById('locationMessage');
@@ -381,13 +418,11 @@
             }
         }
 
-        // Adicionar evento de clique ao botão de localização
+
         document.getElementById('btnLocation').addEventListener('click', getUserLocation);
 
-        // Mostrar o status inicial
         document.getElementById('locationStatus').style.display = 'flex';
 
-        // Adicione esta função antes do event listener do formulário
         function updateLoadingStep(step) {
             document.querySelectorAll('.loading-step').forEach(el => {
                 el.classList.remove('active');
@@ -425,6 +460,7 @@
 
             const dados = {
                 tipo_cultura: document.getElementById('tipo_cultura').value,
+                regiao: document.getElementById('regiao').value,
                 estagio_cultura: document.getElementById('estagio_cultura').value,
                 latitude: userLatitude,
                 longitude: userLongitude,
@@ -436,8 +472,7 @@
             };
             
             try {
-                // Garantir um tempo mínimo total de processamento
-                const minProcessingTime = 23000; // 23 segundos no total
+                const minProcessingTime = 23000; 
                 const startTime = Date.now();
                 
                 const response = await fetch('/processar', {
@@ -450,14 +485,69 @@
                 
                 const data = await response.json();
                 
-                // Calcular tempo restante para atingir o tempo mínimo
                 const elapsedTime = Date.now() - startTime;
                 if (elapsedTime < minProcessingTime) {
                     await new Promise(resolve => setTimeout(resolve, minProcessingTime - elapsedTime));
                 }
                 
                 if (data.success) {
-                    resultadoTexto.textContent = data.resultado;
+                    let textoFormatado = '';
+                    const analise = data.resultado.analise.dados_analisados;
+
+                    if (analise.busca_e_analise) {
+                        textoFormatado += `📊 Análise da Cultura\n`;
+                        textoFormatado += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+                        
+                        if (userLatitude && userLongitude) {
+                            textoFormatado += `📍 Localização: ${userLatitude.toFixed(6)}, ${userLongitude.toFixed(6)}\n\n`;
+                        }
+
+                        textoFormatado += `🌡️ Condições Atuais:\n`;
+                        textoFormatado += `• Temperatura: ${dados.temperatura}°C\n`;
+                        textoFormatado += `• Umidade do Solo: ${dados.umidade_solo}%\n`;
+                        textoFormatado += `• Umidade do Ar: ${dados.umidade_ar}%\n\n`;
+
+                        textoFormatado += `${analise.busca_e_analise.conteudo}\n\n`;
+                    }
+
+                    if (analise.diagnostico) {
+                        textoFormatado += `🔍 ${analise.diagnostico.titulo}\n`;
+                        textoFormatado += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+                        
+                        const diagnosticoItems = analise.diagnostico.conteudo.split('\n');
+                        diagnosticoItems.forEach(item => {
+                            if (item.trim()) {
+                                textoFormatado += `• ${item.trim()}\n`;
+                            }
+                        });
+                        textoFormatado += '\n';
+                    }
+                    if (analise.insumos) {
+                        textoFormatado += `🌱 Recomendações de Insumos\n`;
+                        textoFormatado += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+                        
+                        const insumosItems = analise.insumos.conteudo.split('\n');
+                        let currentCategory = '';
+                        
+                        insumosItems.forEach((item) => {
+                            if (item.trim()) {
+                                if (item.includes(':')) {
+                                    currentCategory = item.trim();
+                                    textoFormatado += `${currentCategory}\n`;
+                                } else {
+                                    const formattedItem = item.trim()
+                                        .replace(/\*\*/g, '') 
+                                        .replace(/^\d+\.\s*/, '') 
+                                        .replace(/^\* /, '- '); 
+                                    
+                                    textoFormatado += `${formattedItem}\n`;
+                                }
+                            }
+                        });
+                        textoFormatado += '\n';
+                    }
+
+                    resultadoTexto.textContent = textoFormatado;
                     resultadoModal.show();
                 } else {
                     alert('Erro ao processar: ' + data.error);
@@ -471,10 +561,112 @@
             }
         });
 
-        // Adicione o evento para o botão de download (implementação básica)
         document.getElementById('btnDownloadPDF').addEventListener('click', () => {
-            // Implemente aqui a lógica para download do PDF
-            alert('Funcionalidade de download em desenvolvimento');
+            const resultadoTexto = document.getElementById('resultadoTexto').textContent;
+            const dataAtual = new Date().toLocaleDateString('pt-BR');
+            const tipoCultura = document.getElementById('tipo_cultura').value;
+            
+            const elementoParaPDF = document.createElement('div');
+            elementoParaPDF.innerHTML = `
+                <div style="padding: 20px; font-family: Arial, sans-serif; line-height: 1.6;">
+                    <!-- Cabeçalho -->
+                    <div style="text-align: center; margin-bottom: 30px; padding: 20px; border-bottom: 2px solid #2E7D32;">
+                        <h1 style="color: #2E7D32; margin: 0; font-size: 24px;">Relatório de Análise Agrícola</h1>
+                        <h2 style="color: #4CAF50; margin: 10px 0; font-size: 20px;">Cultura: ${tipoCultura}</h2>
+                        <p style="color: #666; margin: 5px 0;">Data da Análise: ${dataAtual}</p>
+                    </div>
+
+                    <!-- Conteúdo Principal -->
+                    <div style="margin: 20px 0; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; color: #333;">
+                        ${resultadoTexto.replace(/━+/g, '_'.repeat(50))}
+                    </div>
+
+                    <!-- Rodapé -->
+                    <div style="margin-top: 40px; text-align: center; border-top: 1px solid #ddd; padding-top: 20px;">
+                        <p style="color: #666; font-size: 12px; margin: 5px 0;">
+                            Documento gerado por Agricultura 4.0 - Sistema de Análise de Culturas
+                        </p>
+                        <p style="color: #666; font-size: 12px; margin: 5px 0;">
+                            © ${new Date().getFullYear()} - Todos os direitos reservados
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            const opt = {
+                margin: [15, 15, 15, 15],
+                filename: `analise-agricola-${tipoCultura}-${dataAtual}.pdf`,
+                image: { type: 'jpeg', quality: 1 },
+                html2canvas: { 
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    letterRendering: true,
+                    allowTaint: true,
+                    scrollY: 0,
+                    windowWidth: 1200
+                },
+                jsPDF: { 
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'portrait',
+                    compress: true,
+                    precision: 16,
+                    putOnlyUsedFonts: true
+                },
+                pagebreak: { 
+                    mode: ['avoid-all', 'css', 'legacy'],
+                    before: '.page-break-before',
+                    after: '.page-break-after'
+                }
+            };
+
+            // Adiciona um loader durante a geração do PDF
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(255, 255, 255, 0.9);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 9999;
+            `;
+            loadingOverlay.innerHTML = `
+                <div style="text-align: center;">
+                    <div class="spinner-border text-success" role="status"></div>
+                    <p style="margin-top: 10px;">Gerando PDF...</p>
+                </div>
+            `;
+            document.body.appendChild(loadingOverlay);
+
+            // Gera o PDF com tratamento de erro
+            html2pdf()
+                .from(elementoParaPDF)
+                .set(opt)
+                .toPdf()
+                .get('pdf')
+                .then((pdf) => {
+                    pdf.setProperties({
+                        title: `Análise Agrícola - ${tipoCultura}`,
+                        subject: 'Relatório de Análise de Cultura',
+                        author: 'Agricultura 4.0',
+                        keywords: 'agricultura, análise, culturas',
+                        creator: 'Sistema Agricultura 4.0'
+                    });
+                })
+                .save()
+                .then(() => {
+                    document.body.removeChild(loadingOverlay);
+                })
+                .catch(error => {
+                    console.error('Erro ao gerar PDF:', error);
+                    document.body.removeChild(loadingOverlay);
+                    alert('Ocorreu um erro ao gerar o PDF. Por favor, tente novamente.');
+                });
         });
     </script>
 </body>

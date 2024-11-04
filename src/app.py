@@ -5,7 +5,7 @@ import os
 import requests
 from dotenv import load_dotenv
 import logging
-from time import time
+from time import time, sleep
 
 load_dotenv()
 
@@ -38,21 +38,31 @@ def setup_environment():
         logger.error(f"Erro na configuração do ambiente: {str(e)}", exc_info=True)
         raise Exception(f"Erro ao configurar o ambiente: {str(e)}")
 
-def setup_agents(my_llm, tools, tipo_cultura, estagio_cultura, sintomas, ultimos_tratamentos, temperatura, umidade_solo, umidade_ar):
+def setup_agents(my_llm, tools, tipo_cultura, estagio_cultura, sintomas, ultimos_tratamentos, temperatura, umidade_solo, umidade_ar, local, regiao):
     buscador = Agent(
         role='Agente de Busca e Análise de Cultura',
-        goal='Buscar informações específicas sobre a cultura e suas necessidades baseadas no estágio de desenvolvimento',
+        goal='Buscar informações específicas sobre a cultura e condições climáticas',
         backstory=f'''
-            Você é um especialista em agricultura com vasto conhecimento em diferentes culturas.
-            Analise as condições ideais para o desenvolvimento da {tipo_cultura} no estágio {estagio_cultura}.
+            Você é um especialista em agricultura e meteorologia.
+            Quero que forneça informações sobre as condições climáticas atuais e previsões para a cultura de {tipo_cultura} na região {regiao} do Brasil, localização específica: {local}.
             
-            IMPORTANTE: Ao usar ferramentas, siga EXATAMENTE este formato:
+            Considere:
+            - Temperatura atual: {temperatura}°C
+            - Umidade do Solo: {umidade_solo}%
+            - Umidade do Ar: {umidade_ar}%
             
-            Thought: [seu pensamento]
-            Action Input: {{"query": "sua busca aqui"}}
-            Observation: [resultado da busca]
+            FORMATO OBRIGATÓRIO PARA RESPOSTAS:
+            1. Para usar uma ferramenta:
+                Thought: [seu pensamento]
+                Action: duckduckgo_search
+                Action Input: {{"query": "sua busca aqui"}}
+                Observation: [resultado da busca]
             
-            Final Answer: [sua resposta final em português]
+            2. Para resposta final:
+                Thought: Agora posso fornecer uma resposta completa
+                Final Answer: [sua resposta detalhada em português]
+            
+            Não desvie deste formato exato.
         ''',
         llm=my_llm,
         verbose=True,
@@ -62,26 +72,33 @@ def setup_agents(my_llm, tools, tipo_cultura, estagio_cultura, sintomas, ultimos
     
     fitopatologista = Agent(
         role='Especialista em Diagnóstico e Tratamento',
-        goal='Analisar sintomas, histórico de tratamentos e condições ambientais para diagnóstico preciso',
+        goal='Analisar sintomas e recomendar tratamentos específicos',
         backstory=f'''
-            Você é um fitopatologista especializado em diagnóstico de doenças e pragas.
+            Você é um consultor agrícola especializado em fitopatologia.
             
-            IMPORTANTE: Ao usar ferramentas, siga EXATAMENTE este formato:
-            
-            Thought: [seu pensamento]
-            Action: duckduckgo_search
-            Action Input: {{"query": "sua busca aqui"}}
-            Observation: [resultado da busca]
-            
-            Thought: I now know the final answer
-            Final Answer: [sua resposta final em português]
-            
-            Analise os sintomas relatados: {sintomas}
-            Considere os tratamentos anteriores: {ultimos_tratamentos}
-            Avalie as condições ambientais atuais:
+            Baseado na cultura de {tipo_cultura} e nas condições:
+            - Estágio: {estagio_cultura}
+            - Sintomas: {sintomas}
+            - Tratamentos anteriores: {ultimos_tratamentos}
             - Temperatura: {temperatura}°C
             - Umidade do Solo: {umidade_solo}%
             - Umidade do Ar: {umidade_ar}%
+            
+            Liste as pragas e doenças mais comuns e recomende tratamentos ou práticas preventivas.
+            Considere também condições locais e histórico de tratamentos.
+            
+            FORMATO OBRIGATÓRIO PARA RESPOSTAS:
+            1. Para usar uma ferramenta:
+                Thought: [seu pensamento]
+                Action: duckduckgo_search
+                Action Input: {{"query": "sua busca aqui"}}
+                Observation: [resultado da busca]
+            
+            2. Para resposta final:
+                Thought: Agora posso fornecer uma resposta completa
+                Final Answer: [sua resposta detalhada em português]
+            
+            Não desvie deste formato exato.
         ''',
         tools=tools,
         llm=my_llm,
@@ -90,13 +107,30 @@ def setup_agents(my_llm, tools, tipo_cultura, estagio_cultura, sintomas, ultimos
     )
     
     especialista_insumos = Agent(
-        role='Recomendação de Produtos e Equipamentos Agrícolas',
-        goal='Recomendar produtos, fertilizantes, e equipamentos agrícolas com base no tipo de cultura e nas condições do solo/clima.',
-        backstory='''
+        role='Especialista em Insumos e Equipamentos',
+        goal='Recomendar produtos e equipamentos específicos para a cultura',
+        backstory=f'''
             Você é um especialista em insumos agrícolas e equipamentos.
-            Para a cultura de [tipo de cultura], considerando o clima com temperatura de [temperatura] e umidade de [umidade],
-            recomende fertilizantes, pesticidas e maquinários adequados. Inclua detalhes como frequência de uso,
-            quantidade recomendada e links para produtos, se possível.
+            Para a cultura de {tipo_cultura} no estágio {estagio_cultura}, considerando:
+            - Temperatura: {temperatura}°C
+            - Umidade do Solo: {umidade_solo}%
+            - Umidade do Ar: {umidade_ar}%
+            
+            Recomende fertilizantes, pesticidas e equipamentos adequados.
+            Inclua detalhes como frequência de uso, quantidade recomendada e especificações técnicas.
+            
+            FORMATO OBRIGATÓRIO PARA RESPOSTAS:
+            1. Para usar uma ferramenta:
+                Thought: [seu pensamento]
+                Action: duckduckgo_search
+                Action Input: {{"query": "sua busca aqui"}}
+                Observation: [resultado da busca]
+            
+            2. Para resposta final:
+                Thought: Agora posso fornecer uma resposta completa
+                Final Answer: [sua resposta detalhada em português]
+            
+            Não desvie deste formato exato.
         ''',
         tools=tools,
         llm=my_llm,
@@ -105,21 +139,31 @@ def setup_agents(my_llm, tools, tipo_cultura, estagio_cultura, sintomas, ultimos
     )
     
     agente_monitoramento = Agent(
-        role='Agente de Coleta de Dados de Sensores',
-        goal='Analisar e registrar dados dos sensores e condições da cultura, fornecendo recomendações diretas baseadas nas informações disponíveis',
+        role='Agente de Monitoramento',
+        goal='Monitorar dados dos sensores e recomendar ações',
         backstory=f'''
-            Você é um sistema automatizado de monitoramento agrícola especializado em análise de dados.
-            Com base nos dados fornecidos:
-            - Tipo de cultura: {tipo_cultura}
-            - Estágio: {estagio_cultura}
-            - Temperatura: {temperatura}°C
+            Você é um sistema de monitoramento agrícola responsável por interpretar dados de sensores em tempo real.
+            
+            Para a cultura {tipo_cultura}:
+            - Temperatura atual: {temperatura}°C
             - Umidade do Solo: {umidade_solo}%
             - Umidade do Ar: {umidade_ar}%
-            - Sintomas: {sintomas}
-            - Tratamentos anteriores: {ultimos_tratamentos}
+            - Estágio: {estagio_cultura}
             
-            Forneça uma análise direta das condições e recomendações específicas sem fazer perguntas adicionais.
-            Sempre inclua: status atual, riscos identificados e ações recomendadas.
+            Compare com os parâmetros ideais e determine ações necessárias.
+            
+            FORMATO OBRIGATÓRIO PARA RESPOSTAS:
+            1. Para usar uma ferramenta:
+                Thought: [seu pensamento]
+                Action: duckduckgo_search
+                Action Input: {{"query": "sua busca aqui"}}
+                Observation: [resultado da busca]
+            
+            2. Para resposta final:
+                Thought: Agora posso fornecer uma resposta completa
+                Final Answer: [sua resposta detalhada em português]
+            
+            Não desvie deste formato exato.
         ''',
         tools=tools,
         llm=my_llm,
@@ -129,149 +173,211 @@ def setup_agents(my_llm, tools, tipo_cultura, estagio_cultura, sintomas, ultimos
     
     return buscador, fitopatologista, especialista_insumos, agente_monitoramento
 
-def formatar_resposta(resultado, model):
-    # Garantir que resultado seja sempre uma lista
-    resultados = resultado if isinstance(resultado, list) else [resultado]
+def setup_tasks(buscador, fitopatologista, especialista_insumos, agente_monitoramento, tipo_cultura, estagio_cultura, local, regiao):
+    tarefa_busca = Task(
+        description=f'''
+            Responda SEMPRE em português do Brasil:
+            1. Busque informações sobre {tipo_cultura} em estágio de {estagio_cultura} na região {regiao} do Brasil, localização específica: {local}
+            2. Colete dados sobre temperatura ideal, umidade necessária e outras condições específicas para esta região
+            3. Compare as condições atuais com as ideais para esta cultura nesta região
+            4. Identifique riscos específicos para este estágio e região
+        ''',
+        agent=buscador,
+        expected_output='Relatório detalhado das condições e requisitos para a cultura especificada'
+    )
     
-    return {
-        "success": True,
-        "timestamp": time(),
-        "resultado": {
-            "analise": {
-                "resumo_geral": "Análise da Cultura e Recomendações",
-                "dados_analisados": {
-                    "busca_e_analise": {
-                        "titulo": "Análise da Cultura",
-                        "conteudo": resultados[0] if len(resultados) > 0 else ""
+    tarefa_diagnostico = Task(
+        description=f'''
+            Responda SEMPRE em português do Brasil:
+            1. Analise os dados climáticos coletados para {tipo_cultura}
+            2. Identifique possíveis pragas e doenças com base nas condições atuais
+            3. Avalie os tratamentos anteriores
+            4. Recomende tratamentos preventivos e corretivos específicos
+        ''',
+        agent=fitopatologista,
+        expected_output='Lista de pragas/doenças prováveis e recomendações de tratamento'
+    )
+    
+    tarefa_insumos = Task(
+        description=f'''
+            Responda SEMPRE em português do Brasil:
+            1. Com base nos dados climáticos e recomendações do fitopatologista
+            2. Sugira fertilizantes e produtos adequados para {tipo_cultura}
+            3. Recomende equipamentos necessários para aplicação
+            4. Forneça especificações de uso e aplicação
+        ''',
+        agent=especialista_insumos,
+        expected_output='Lista de insumos e equipamentos recomendados com especificações'
+    )
+    
+    tarefa_monitoramento = Task(
+        description=f'''
+            Responda SEMPRE em português do Brasil:
+            1. Registre os dados dos sensores de umidade e temperatura para {tipo_cultura}
+            2. Compare com os parâmetros ideais para a cultura
+            3. Determine ações necessárias com base nas condições atuais
+            4. Indique próximas ações recomendadas
+        ''',
+        agent=agente_monitoramento,
+        expected_output='Registro de dados e recomendações de ações imediatas'
+    )
+    
+    return [tarefa_busca, tarefa_diagnostico, tarefa_insumos, tarefa_monitoramento]
+
+def formatar_resposta(resultado, model):
+    try:
+        if not resultado or not resultado.tasks_output:
+            raise ValueError("Resultado vazio recebido")
+
+        tasks = resultado.tasks_output
+        resultados_formatados = {
+            "busca_e_analise": tasks[0].raw if len(tasks) > 0 else "Sem dados",
+            "diagnostico": tasks[1].raw if len(tasks) > 1 else "Sem dados",
+            "insumos": tasks[2].raw if len(tasks) > 2 else "Sem dados",
+            "monitoramento": tasks[3].raw if len(tasks) > 3 else "Sem dados"
+        }
+        
+        return {
+            "success": True,
+            "timestamp": time(),
+            "resultado": {
+                "analise": {
+                    "resumo_geral": "Análise da Cultura e Recomendações",
+                    "dados_analisados": {
+                        "busca_e_analise": {
+                            "titulo": "Análise da Cultura",
+                            "conteudo": resultados_formatados["busca_e_analise"]
+                        },
+                        "diagnostico": {
+                            "titulo": "Diagnóstico e Tratamentos",
+                            "conteudo": resultados_formatados["diagnostico"]
+                        },
+                        "insumos": {
+                            "titulo": "Recomendações de Insumos",
+                            "conteudo": resultados_formatados["insumos"]
+                        },
+                        "monitoramento": {
+                            "titulo": "Monitoramento e Ações",
+                            "conteudo": resultados_formatados["monitoramento"]
+                        }
                     },
-                    "diagnostico": {
-                        "titulo": "Diagnóstico e Tratamentos",
-                        "conteudo": resultados[1] if len(resultados) > 1 else ""
-                    },
-                    "insumos": {
-                        "titulo": "Recomendações de Insumos",
-                        "conteudo": resultados[2] if len(resultados) > 2 else ""
-                    },
-                    "monitoramento": {
-                        "titulo": "Status e Próximas Ações",
-                        "conteudo": resultados[3] if len(resultados) > 3 else ""
-                    }
                 },
-                "recomendacoes_gerais": "Com base nas análises acima, recomenda-se atenção aos pontos identificados e seguimento das orientações fornecidas."
-            },
-            "metadata": {
-                "versao": "1.0",
-                "modelo_usado": model,
-                "data_analise": time(),
-                "idioma": "pt-BR"
+                "metadata": {
+                    "versao": "1.0",
+                    "modelo_usado": model,
+                    "data_analise": time(),
+                    "idioma": "pt-BR"
+                }
             }
         }
-    }
+    except Exception as e:
+        logger.error(f"Erro ao formatar resposta: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": "Erro ao processar resultados",
+            "message": str(e),
+            "timestamp": time()
+        }
 
 @app.route('/processar', methods=['POST'])
 def processar():
     try:
         logger.info("Iniciando processamento de nova requisição")
         dados = request.get_json()
+        logger.info(f"Dados recebidos: {dados}")
         
-        campos_obrigatorios = ['tipo_cultura', 'estagio_cultura', 'sintomas', 
-                             'ultimos_tratamentos', 'temperatura', 'umidade_solo', 'umidade_ar']
-        for campo in campos_obrigatorios:
-            if campo not in dados:
-                raise ValueError(f"Campo obrigatório ausente: {campo}")
+        if 'latitude' in dados and 'longitude' in dados:
+            dados['local'] = f"Coordenadas: {dados['latitude']}, {dados['longitude']}"
+        
+        campos_obrigatorios = {
+            'tipo_cultura': 'Tipo da cultura',
+            'regiao': 'Região',
+            'estagio_cultura': 'Estágio da cultura',
+            'sintomas': 'Sintomas observados',
+            'ultimos_tratamentos': 'Últimos tratamentos realizados',
+            'temperatura': 'Temperatura atual',
+            'umidade_solo': 'Umidade do solo',
+            'umidade_ar': 'Umidade do ar',
+            'local': 'Localização da cultura'
+        }
+        
+        for campo in ['temperatura', 'umidade_solo', 'umidade_ar']:
+            if campo in dados and isinstance(dados[campo], str):
+                dados[campo] = float(dados[campo])
+        
+        campos_faltantes = []
+        for campo, descricao in campos_obrigatorios.items():
+            if campo not in dados or not dados[campo]:
+                campos_faltantes.append(descricao)
+                logger.warning(f"Campo faltante ou vazio: {campo} ({descricao})")
+        
+        if campos_faltantes:
+            erro_response = {
+                "success": False,
+                "error": "Campos obrigatórios ausentes",
+                "campos_faltantes": campos_faltantes,
+                "mensagem": "Por favor, preencha todos os campos obrigatórios"
+            }
+            logger.error(f"Validação falhou: {erro_response}")
+            return jsonify(erro_response), 400
 
         my_llm, tools = setup_environment()
         
         max_retries = 3
         for tentativa in range(max_retries):
             try:
+                # Adicionando tempo de espera entre tentativas
+                if tentativa > 0:
+                    sleep(tentativa * 2)  # Espera progressiva
+                
+                # Setup dos agentes
                 buscador, fitopatologista, especialista_insumos, agente_monitoramento = setup_agents(
-                    my_llm, 
-                    tools,
-                    dados.get('tipo_cultura'),
-                    dados.get('estagio_cultura'),
-                    dados.get('sintomas'),
-                    dados.get('ultimos_tratamentos'),
-                    dados.get('temperatura'),
-                    dados.get('umidade_solo'),
-                    dados.get('umidade_ar')
+                    my_llm, tools,
+                    dados['tipo_cultura'],
+                    dados['estagio_cultura'],
+                    dados['sintomas'],
+                    dados['ultimos_tratamentos'],
+                    dados['temperatura'],
+                    dados['umidade_solo'],
+                    dados['umidade_ar'],
+                    dados['local'],
+                    dados['regiao']
+                )
+         
+                tarefas = setup_tasks(
+                    buscador, 
+                    fitopatologista, 
+                    especialista_insumos,
+                    agente_monitoramento,
+                    dados['tipo_cultura'],
+                    dados['estagio_cultura'],
+                    dados['local'],
+                    dados['regiao']
                 )
                 
-                tarefa_busca = Task(
-                    description=f'''
-                        Responda SEMPRE em português do Brasil:
-                        1. Busque informações sobre {dados.get('tipo_cultura')} em estágio de {dados.get('estagio_cultura')}
-                        2. Compare as condições atuais com as ideais
-                        3. Identifique riscos específicos para este estágio
-                        4. Forneça recomendações de manejo específicas
-                    ''',
-                    agent=buscador,
-                    expected_output='Relatório detalhado em português das condições e requisitos para a cultura especificada'
+
+                crew = Crew(
+                    agents=[buscador, fitopatologista, especialista_insumos, agente_monitoramento],
+                    tasks=tarefas,
+                    verbose=1,
+                    process=Process.sequential
                 )
                 
-                tarefa_diagnostico = Task(
-                    description=f'''
-                        Responda SEMPRE em português do Brasil:
-                        1. Analise os sintomas relatados: {dados.get('sintomas')}
-                        2. Considere o histórico de tratamentos: {dados.get('ultimos_tratamentos')}
-                        3. Avalie se os tratamentos anteriores foram adequados
-                        4. Identifique possíveis doenças ou pragas com base nos sintomas
-                        5. Sugira tratamentos considerando o histórico e estágio atual
-                    ''',
-                    agent=fitopatologista,
-                    expected_output='Lista em português de possíveis doenças/pragas e recomendações de tratamento'
-                )
+                resultados = crew.kickoff()
                 
-                tarefa_insumos = Task(
-                    description=f'''
-                        Responda SEMPRE em português do Brasil:
-                        1. Analise as necessidades da {dados.get('tipo_cultura')} no estágio {dados.get('estagio_cultura')}
-                        2. Recomende insumos e equipamentos adequados considerando as condições atuais
-                        3. Forneça especificações de uso e aplicação
-                    ''',
-                    agent=especialista_insumos,
-                    expected_output='Lista em português de insumos e equipamentos recomendados com especificações de uso'
-                )
+                if not resultados:
+                    raise ValueError("Nenhum resultado obtido dos agentes")
+                    
+                response = formatar_resposta(resultados, my_llm.model)
+                if not response.get("success"):
+                    return jsonify(response), 500
+                    
+                return jsonify(response)
                 
-                tarefa_monitoramento = Task(
-                    description=f'''
-                        Responda SEMPRE em português do Brasil:
-                        1. Registre e analise as condições atuais:
-                           - Status da cultura
-                           - Condições ambientais
-                           - Sintomas observados
-                        2. Identifique riscos com base nos dados disponíveis
-                        3. Forneça recomendações diretas de ações necessárias
-                        4. Estabeleça prioridades de monitoramento
-                        
-                        Formato da resposta:
-                        - Status Atual: [descrição]
-                        - Riscos Identificados: [lista]
-                        - Ações Recomendadas: [lista priorizada]
-                        - Próximo Monitoramento: [recomendação]
-                    ''',
-                    agent=agente_monitoramento,
-                    expected_output='Relatório estruturado em português com análise e recomendações baseadas nos dados disponíveis'
-                )
-                
-                resultados = []  # Lista para armazenar todos os resultados
-                
-                # Executar cada tarefa individualmente para coletar todos os resultados
-                for tarefa in [tarefa_busca, tarefa_diagnostico, tarefa_insumos, tarefa_monitoramento]:
-                    crew = Crew(
-                        agents=[buscador, fitopatologista, especialista_insumos, agente_monitoramento],
-                        tasks=[tarefa],
-                        verbose=1,
-                        process=Process.sequential
-                    )
-                    resultado = crew.kickoff()
-                    resultados.append(resultado)
-                
-                return jsonify(formatar_resposta(resultados, my_llm.model))
             except Exception as crew_error:
                 logger.warning(f"Tentativa {tentativa + 1} falhou: {str(crew_error)}")
                 if tentativa == max_retries - 1:
-                    raise crew_error
+                    raise Exception(f"Todas as tentativas falharam. Último erro: {str(crew_error)}")
                 continue
 
     except Exception as e:
@@ -279,7 +385,8 @@ def processar():
         return jsonify({
             "success": False,
             "error": str(e),
-            "detalhes": "Erro ao processar a requisição"
+            "detalhes": "Erro ao processar a requisição",
+            "timestamp": time()
         }), 500
 
 if __name__ == '__main__':
